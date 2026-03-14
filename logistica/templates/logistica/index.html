@@ -6,6 +6,9 @@
 {% block extra_css %}
 <style>
     .threshold-below { background-color: rgba(180, 50, 50, 0.35) !important; }
+    .collapse-icon { transition: transform 0.2s; }
+    [aria-expanded="true"] .collapse-icon { transform: rotate(90deg); }
+    .contract-detail { background-color: rgba(29, 29, 29, 0.24); padding: 6px; margin:6px; }
 </style>
 {% endblock %}
 
@@ -18,13 +21,15 @@
     </div>
 
     {% if by_location %}
-        {% for location, contracts in by_location.items %}
+        {% for location, groups in by_location.items %}
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fa-solid fa-sun me-2"></i>{{ location }}</h5>
-                        <span class="badge bg-secondary">{{ contracts|length }} {% trans "contract types" %}</span>
+                        {% with p=groups.prefixed|length u=groups.unprefixed|length %}
+                        <span class="badge bg-secondary">{{ p|add:u }} {% trans "contract types" %}</span>
+                        {% endwith %}
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -37,10 +42,11 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for row in contracts %}
+                                    {% for row in groups.prefixed %}
+                                    {% with loc_idx=forloop.parentloop.counter row_idx=forloop.counter %}
                                     <tr {% if row.below_threshold %}class="threshold-below"{% endif %}
                                         data-bs-toggle="collapse"
-                                        data-bs-target="#detail-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                                        data-bs-target="#detail-p-{{ loc_idx }}-{{ row_idx }}"
                                         aria-expanded="false"
                                         style="cursor:pointer">
                                         <td>
@@ -64,7 +70,7 @@
                                     </tr>
                                     <tr>
                                         <td colspan="3" class="p-0 border-0">
-                                            <div class="collapse" id="detail-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                            <div class="collapse contract-detail" id="detail-p-{{ loc_idx }}-{{ row_idx }}">
                                                 <table class="table table-sm table-dark mb-0">
                                                     <thead>
                                                         <tr>
@@ -113,8 +119,104 @@
                                             </div>
                                         </td>
                                     </tr>
+                                    {% endwith %}
                                     {% endfor %}
                                 </tbody>
+                                {% if groups.unprefixed %}
+                                <tbody>
+                                    <tr class="table-secondary"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#other-{{ forloop.counter }}"
+                                        aria-expanded="false"
+                                        style="cursor:pointer">
+                                        <td colspan="3" class="fw-semibold text-muted small py-1 px-3">
+                                            <i class="fa-solid fa-chevron-right me-1 collapse-icon"></i>{% trans "Other Contracts" %}
+                                            <span class="badge bg-secondary ms-2">{{ groups.unprefixed|length }}</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tbody class="collapse" id="other-{{ forloop.counter }}">
+                                    {% for row in groups.unprefixed %}
+                                    {% with loc_idx=forloop.parentloop.counter row_idx=forloop.counter %}
+                                    <tr {% if row.below_threshold %}class="threshold-below"{% endif %}
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#detail-u-{{ loc_idx }}-{{ row_idx }}"
+                                        aria-expanded="false"
+                                        style="cursor:pointer">
+                                        <td>
+                                            {% if row.below_threshold %}
+                                                <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>
+                                            {% endif %}
+                                            {{ row.title|default:"-" }}
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if row.below_threshold %}bg-danger{% elif row.threshold %}bg-success{% else %}bg-primary{% endif %}">
+                                                {{ row.count }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if row.threshold %}
+                                                <span class="text-muted">{{ row.threshold }}</span>
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3" class="p-0 border-0">
+                                            <div class="collapse contract-detail" id="detail-u-{{ loc_idx }}-{{ row_idx }}">
+                                                <table class="table table-sm table-dark mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>{% trans "Issuer" %}</th>
+                                                            <th>{% trans "Main" %}</th>
+                                                            <th>{% trans "Price" %}</th>
+                                                            <th>{% trans "Issued" %}</th>
+                                                            <th>{% trans "Expires" %}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for c in row.contracts %}
+                                                        {% main_character c.issuer_id as main %}
+                                                        <tr>
+                                                            <td>
+                                                                {% if c.issuer_id %}
+                                                                    <a href="{% url 'corptools:reactmain' c.issuer_id %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                                                                        <img src="{% eve_image "character" c.issuer_id 32 %}"
+                                                                             alt="{{ c.issuer_name__name }}"
+                                                                             class="rounded" width="32" height="32" loading="lazy">
+                                                                        {{ c.issuer_name__name|default:"-" }}
+                                                                    </a>
+                                                                {% else %}
+                                                                    {{ c.issuer_name__name|default:"-" }}
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if main %}
+                                                                    <a href="{% url 'corptools:reactmain' main.main_id %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                                                                        <img src="{% eve_image "character" main.main_id 32 %}"
+                                                                             alt="{{ main.main_name }}"
+                                                                             class="rounded" width="32" height="32" loading="lazy">
+                                                                        {{ main.main_name }}
+                                                                    </a>
+                                                                {% else %}
+                                                                    <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>{{ c.price|floatformat:0|intcomma|default:"-" }}</td>
+                                                            <td>{{ c.date_issued|date:"Y-m-d" }}</td>
+                                                            <td>{{ c.date_expired|date:"Y-m-d" }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% endfor %}
+                                </tbody>
+                                {% endif %}
                             </table>
                         </div>
                     </div>

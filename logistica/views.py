@@ -89,7 +89,11 @@ def index(request):
         row["threshold"] = threshold
         row["below_threshold"] = threshold is not None and row["count"] < threshold
         row["contracts"] = detail_map.get((system_id, row["title"] or ""), [])
-        by_location.setdefault(system_name, []).append(row)
+        by_location.setdefault(system_name, {"prefixed": [], "unprefixed": []})
+        if (row["title"] or "").startswith("["):
+            by_location[system_name]["prefixed"].append(row)
+        else:
+            by_location[system_name]["unprefixed"].append(row)
         for t in thresholds:
             if t.solar_system_id == system_id and t.matches_title(row["title"] or ""):
                 covered_thresholds.add(t.pk)
@@ -98,19 +102,22 @@ def index(request):
     for t in thresholds:
         if t.pk not in covered_thresholds:
             loc = t.solar_system.name
-            by_location.setdefault(loc, []).append({
+            by_location.setdefault(loc, {"prefixed": [], "unprefixed": []})
+            row = {
                 "title": t.title,
                 "count": 0,
                 "threshold": t.minimum_count,
                 "below_threshold": True,
                 "contracts": [],
-            })
+            }
+            if t.title.startswith("["):
+                by_location[loc]["prefixed"].append(row)
+            else:
+                by_location[loc]["unprefixed"].append(row)
 
-    for rows_list in by_location.values():
-        rows_list.sort(key=lambda r: (
-            0 if (r["title"] or "").startswith("[") else 1,
-            (r["title"] or "").lower()
-        ))
+    for groups in by_location.values():
+        for rows_list in groups.values():
+            rows_list.sort(key=lambda r: (r["title"] or "").lower())
 
     context = {
         "title": "Logistica",
