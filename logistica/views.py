@@ -41,14 +41,13 @@ def index(request):
         assignee_id__in=assignee_ids,
     )
 
-    rows = (
+    rows = list(
         base_qs.values(
             "title",
-            "start_location_name__location_name",
             "start_location_name__system_id",
         )
         .annotate(count=Count("contract_id"))
-        .order_by("start_location_name__location_name")
+        .order_by("start_location_name__system_id")
     )
 
     detail_qs = base_qs.select_related("issuer_name").values(
@@ -59,15 +58,19 @@ def index(request):
         "price",
         "date_issued",
         "date_expired",
-        "start_location_name__location_name",
+        "start_location_name__system_id",
     )
 
     detail_map = defaultdict(list)
     for c in detail_qs:
-        loc = c["start_location_name__location_name"] or "Unknown Location"
-        detail_map[(loc, c["title"] or "")].append(c)
+        detail_map[(c["start_location_name__system_id"], c["title"] or "")].append(c)
 
     thresholds = list(ContractThreshold.objects.select_related("solar_system").all())
+
+    # Build system name lookup for all system IDs present in rows and thresholds
+    system_ids = {r["start_location_name__system_id"] for r in rows if r["start_location_name__system_id"]}
+    system_ids.update(t.solar_system_id for t in thresholds)
+    system_name_map = {ms.pk: ms.name for ms in MapSystem.objects.filter(pk__in=system_ids)}
 
     def _threshold_for(system_id, title):
         for t in thresholds:
@@ -78,13 +81,13 @@ def index(request):
     by_location = {}
     covered_thresholds = set()
     for row in rows:
-        loc = row["start_location_name__location_name"] or "Unknown Location"
         system_id = row["start_location_name__system_id"]
+        system_name = system_name_map.get(system_id) or "Unknown System"
         threshold = _threshold_for(system_id, row["title"] or "")
         row["threshold"] = threshold
         row["below_threshold"] = threshold is not None and row["count"] < threshold
-        row["contracts"] = detail_map.get((loc, row["title"] or ""), [])
-        by_location.setdefault(loc, []).append(row)
+        row["contracts"] = detail_map.get((system_id, row["title"] or ""), [])
+        by_location.setdefault(system_name, []).append(row)
         for t in thresholds:
             if t.solar_system_id == system_id and t.matches_title(row["title"] or ""):
                 covered_thresholds.add(t.pk)
@@ -148,11 +151,13 @@ def threshold_list(request):
         return redirect("logistica:thresholds")
 
     thresholds = ContractThreshold.objects.select_related("solar_system").all()
+    threshold_system_ids = set(thresholds.values_list("solar_system_id", flat=True))
     systems = MapSystem.objects.order_by("name")
     context = {
         "title": "Contract Thresholds",
         "thresholds": thresholds,
         "systems": systems,
+        "threshold_system_ids": threshold_system_ids,
         "match_choices": ContractThreshold.MATCH_CHOICES,
     }
     return render(request, "logistica/thresholds.html", context)

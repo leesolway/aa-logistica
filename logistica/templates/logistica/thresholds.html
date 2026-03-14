@@ -26,9 +26,12 @@
                                 <label class="form-label">{% trans "Solar System" %}</label>
                                 <select name="solar_system" class="form-select" required>
                                     <option value="">— {% trans "select system" %} —</option>
-                                    {% for system in systems %}
+                                    {% for system in systems %}{% if system.pk in threshold_system_ids %}
+                                    <option value="{{ system.pk }}" style="font-weight:bold">{{ system.name }}</option>
+                                    {% endif %}{% endfor %}
+                                    {% for system in systems %}{% if system.pk not in threshold_system_ids %}
                                     <option value="{{ system.pk }}">{{ system.name }}</option>
-                                    {% endfor %}
+                                    {% endif %}{% endfor %}
                                 </select>
                             </div>
                             <div class="col-md-3">
