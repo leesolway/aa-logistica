@@ -1,0 +1,135 @@
+{% extends "logistica/base.html" %}
+{% load i18n humanize logistica_tags %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .threshold-below { background-color: rgba(180, 50, 50, 0.35) !important; }
+</style>
+{% endblock %}
+
+{% block logistica_content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <h2><i class="fa-solid fa-truck"></i> {{ title }}</h2>
+        </div>
+    </div>
+
+    {% if by_location %}
+        {% for location, contracts in by_location.items %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fa-solid fa-location-dot me-2"></i>{{ location }}</h5>
+                        <span class="badge bg-secondary">{{ contracts|length }} {% trans "contract types" %}</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>{% trans "Title" %}</th>
+                                        <th>{% trans "Count" %}</th>
+                                        <th>{% trans "Threshold" %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in contracts %}
+                                    <tr {% if row.below_threshold %}class="threshold-below"{% endif %}
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#detail-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                                        aria-expanded="false"
+                                        style="cursor:pointer">
+                                        <td>
+                                            {% if row.below_threshold %}
+                                                <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>
+                                            {% endif %}
+                                            {{ row.title|default:"-" }}
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if row.below_threshold %}bg-danger{% elif row.threshold %}bg-success{% else %}bg-primary{% endif %}">
+                                                {{ row.count }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if row.threshold %}
+                                                <span class="text-muted">{{ row.threshold }}</span>
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3" class="p-0 border-0">
+                                            <div class="collapse" id="detail-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                                <table class="table table-sm table-dark mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>{% trans "Issuer" %}</th>
+                                                            <th>{% trans "Main" %}</th>
+                                                            <th>{% trans "Price" %}</th>
+                                                            <th>{% trans "Issued" %}</th>
+                                                            <th>{% trans "Expires" %}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for c in row.contracts %}
+                                                        {% main_character c.issuer_id as main %}
+                                                        <tr>
+                                                            <td>
+                                                                {% if c.issuer_id %}
+                                                                    <a href="{% url 'corptools:reactmain' c.issuer_id %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                                                                        <img src="{% eve_image "character" c.issuer_id 32 %}"
+                                                                             alt="{{ c.issuer_name__name }}"
+                                                                             class="rounded" width="32" height="32" loading="lazy">
+                                                                        {{ c.issuer_name__name|default:"-" }}
+                                                                    </a>
+                                                                {% else %}
+                                                                    {{ c.issuer_name__name|default:"-" }}
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if main %}
+                                                                    <a href="{% url 'corptools:reactmain' main.main_id %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                                                                        <img src="{% eve_image "character" main.main_id 32 %}"
+                                                                             alt="{{ main.main_name }}"
+                                                                             class="rounded" width="32" height="32" loading="lazy">
+                                                                        {{ main.main_name }}
+                                                                    </a>
+                                                                {% else %}
+                                                                    <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>{{ c.price|floatformat:0|intcomma|default:"-" }}</td>
+                                                            <td>{{ c.date_issued|date:"Y-m-d" }}</td>
+                                                            <td>{{ c.date_expired|date:"Y-m-d" }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    {% trans "No outstanding item exchange contracts found." %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock logistica_content %}

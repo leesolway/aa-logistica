@@ -1,0 +1,3 @@
+include README.md
+recursive-include logistica/templates *
+recursive-include logistica/static *

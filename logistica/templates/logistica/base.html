@@ -1,0 +1,23 @@
+{% extends "allianceauth/base-bs5.html" %}
+{% load i18n %}
+
+{% block header_nav_brand %}{% translate "Logistica" %}{% endblock %}
+
+{% block header_nav_collapse_left %}
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'logistica:index' %}">
+            {% translate "Dashboard" %}
+        </a>
+    </li>
+    {% if perms.logistica.manage_contract_thresholds %}
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'logistica:thresholds' %}">
+            {% translate "Thresholds" %}
+        </a>
+    </li>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% block logistica_content %}{% endblock %}
+{% endblock %}
