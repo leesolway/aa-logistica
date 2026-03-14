@@ -2,6 +2,7 @@ from django.db import models
 from solo.models import SingletonModel
 
 from allianceauth.authentication.models import State
+from allianceauth.eveonline.models import EveCharacter
 from corptools.models import MapSystem
 
 
@@ -14,6 +15,14 @@ class LogisticaConfiguration(SingletonModel):
         null=True,
         blank=True,
         help_text="Only contracts belonging to corporations in this state will be shown.",
+    )
+
+    esi_character = models.ForeignKey(
+        EveCharacter,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Character whose token is used for ESI structure lookups. Must have the esi-universe.read_structures.v1 scope.",
     )
 
     class Meta:
