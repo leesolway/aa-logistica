@@ -3,6 +3,7 @@ from collections import defaultdict
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import User
 from django.db.models import Count
+from django.utils import timezone
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -39,6 +40,7 @@ def index(request):
         contract_type="item_exchange",
         status="outstanding",
         assignee_id__in=assignee_ids,
+        date_expired__gt=timezone.now(),
     )
 
     rows = list(
