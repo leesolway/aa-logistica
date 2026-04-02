@@ -74,55 +74,54 @@ def index(request):
     system_ids.update(t.solar_system_id for t in thresholds)
     system_name_map = {ms.pk: ms.name for ms in MapSystem.objects.filter(pk__in=system_ids)}
 
-    def _threshold_for(system_id, title):
-        for t in thresholds:
-            if t.solar_system_id == system_id and t.matches_title(title):
-                return t.minimum_count
-        return None
+    def _find_threshold(system_id, title):
+        return next(
+            (t for t in thresholds if t.solar_system_id == system_id and t.matches_title(title)),
+            None,
+        )
+
+    def _place_row(by_location, system_name, row):
+        groups = by_location.setdefault(system_name, {"prefixed": [], "unprefixed": []})
+        bucket = "prefixed" if (row["title"] or "").startswith("[") else "unprefixed"
+        groups[bucket].append(row)
 
     by_location = {}
     covered_thresholds = set()
     for row in rows:
         system_id = row["start_location_name__system_id"]
-        system_name = system_name_map.get(system_id) or "Unknown System"
-        threshold = _threshold_for(system_id, row["title"] or "")
-        row["threshold"] = threshold
-        row["below_threshold"] = threshold is not None and row["count"] < threshold
-        row["contracts"] = detail_map.get((system_id, row["title"] or ""), [])
-        by_location.setdefault(system_name, {"prefixed": [], "unprefixed": []})
-        if (row["title"] or "").startswith("["):
-            by_location[system_name]["prefixed"].append(row)
-        else:
-            by_location[system_name]["unprefixed"].append(row)
-        for t in thresholds:
-            if t.solar_system_id == system_id and t.matches_title(row["title"] or ""):
-                covered_thresholds.add(t.pk)
+        title = row["title"] or ""
+        threshold = _find_threshold(system_id, title)
+        if threshold:
+            covered_thresholds.add(threshold.pk)
+        row["threshold"] = threshold.minimum_count if threshold else None
+        row["below_threshold"] = threshold is not None and row["count"] < threshold.minimum_count
+        row["contracts"] = detail_map.get((system_id, title), [])
+        _place_row(by_location, system_name_map.get(system_id) or "Unknown System", row)
 
     # Add zero-count rows for thresholds with no matching contracts
     for t in thresholds:
         if t.pk not in covered_thresholds:
-            loc = t.solar_system.name
-            by_location.setdefault(loc, {"prefixed": [], "unprefixed": []})
-            row = {
-                "title": t.title,
-                "count": 0,
-                "threshold": t.minimum_count,
-                "below_threshold": True,
-                "contracts": [],
-            }
-            if t.title.startswith("["):
-                by_location[loc]["prefixed"].append(row)
-            else:
-                by_location[loc]["unprefixed"].append(row)
+            row = {"title": t.title, "count": 0, "threshold": t.minimum_count, "below_threshold": True, "contracts": []}
+            _place_row(by_location, t.solar_system.name, row)
 
     for groups in by_location.values():
         for rows_list in groups.values():
             rows_list.sort(key=lambda r: (r["title"] or "").lower())
 
+    threshold_only = request.GET.get("threshold_only") == "1"
+    if threshold_only:
+        by_location = {
+            loc: {"prefixed": [r for r in groups["prefixed"] if r["threshold"] is not None],
+                  "unprefixed": [r for r in groups["unprefixed"] if r["threshold"] is not None]}
+            for loc, groups in by_location.items()
+            if any(r["threshold"] is not None for g in groups.values() for r in g)
+        }
+
     context = {
         "title": "Logistica",
         "by_location": by_location,
         "total": base_qs.count(),
+        "threshold_only": threshold_only,
     }
     return render(request, "logistica/index.html", context)
 
