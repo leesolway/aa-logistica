@@ -3,7 +3,7 @@ from solo.models import SingletonModel
 
 from allianceauth.authentication.models import State
 from allianceauth.eveonline.models import EveCharacter
-from corptools.models import MapSystem
+from eve_sde.models import SolarSystem
 
 
 class LogisticaConfiguration(SingletonModel):
@@ -45,7 +45,7 @@ class ContractThreshold(models.Model):
     ]
 
     solar_system = models.ForeignKey(
-        MapSystem,
+        SolarSystem,
         on_delete=models.CASCADE,
         help_text="Solar system the contract must originate from.",
     )
