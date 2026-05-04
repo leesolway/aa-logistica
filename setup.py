@@ -29,7 +29,6 @@ setup(
     install_requires=[
         "django>=3.2,<5.0",
         "allianceauth>=3.0.0",
-        "allianceauth-app-utils>=1.0.0",
         "django-eveonline-sde>=0.0.1b2",
     ],
     extras_require={
